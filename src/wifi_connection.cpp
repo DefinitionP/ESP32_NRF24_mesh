@@ -5,6 +5,7 @@ String network_info[] = {
     "Node", "password",
     "Baza", "77145055"};
 
+// подключение к сети wifi
 bool wifi_connect() {
     Serial.println("WiFi scan started...");
     int16_t network_count = WiFi.scanNetworks();
@@ -43,7 +44,6 @@ bool wifi_connect() {
     if (connected)
     {
         Serial.printf("successfully connected to \"%s\", IP: %s\n", WiFi.SSID(), WiFi.localIP().toString());
-        // Serial.println(get_internal_port());
         return true;
     }
     else
@@ -52,7 +52,6 @@ bool wifi_connect() {
         return false;
     }
 }
-
 bool wifi_try_connect(uint16_t ms, String ssid, String psk)
 {
     Serial.printf("trying to connect \"%s\", psk is \"%s\"", ssid, psk);
@@ -72,13 +71,11 @@ bool wifi_try_connect(uint16_t ms, String ssid, String psk)
     Serial.println("\nconnected!");
     return true;
 }
-
+// проверка интернет-соединения
 void wifi_connection_check() {
     if (WiFi.status() != WL_CONNECTED) {
-        //Serial.println("internet connection is lost");
+        Serial.println("internet connection is lost");
         blink_async(300, 2, true);
         while(true) {};
-        //while (!wifi_connect()) {};
-        poweron_msg("connection is resumed!");
     }
 }

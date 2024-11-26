@@ -11,12 +11,15 @@ const uint8_t num_channels = 128;
 uint8_t values[num_channels];
 uint8_t out_buffer[num_channels];
 
-// число сканов
-const int num_reps = 100;
 
-const uint32_t pipe_addr = 111156789; // адрес рабочей трубы;
-byte tx_data;
+const int num_reps = 100; // число сканов эфира
+const uint32_t pipe_addr = 111156789; // идентификатор "трубы"
+byte tx_data; 
+byte rx_data[1];
+int scn = 0; // счетчик циклов прослушивания эфира
+int sg = 0;  // счетчик числа принятых пакетов с передатчика
 
+// сканирование всех каналов
 void radio_scan()
 {
     if (!radio.begin())
@@ -25,8 +28,6 @@ void radio_scan()
         Serial.println("radio init ok!");
 
     radio.setAutoAck(false);
-
-    // Get into standby mode
     radio.startListening();
     radio.printDetails();
 
@@ -68,24 +69,20 @@ void radio_scan()
                     ++values[i];
             }
         }
-
         // Print out channel measurements, clamped to a single hex digit
         int i = 0;
-
         String out = "";
         while (i < num_channels)
         {
-            // Serial.printf("%x", min(0xf, values[i] & 0xf));
             out += ("%x", min(0xf, values[i] & 0xf));
             ++i;
         }
-        // Serial.printf("\n\r");
         Serial.println(out);
         send_string(out);
     }
 }
 
-
+// отправка пакетов в эфир
 void radio_tx_test()
 {
     if (!radio.begin())
@@ -110,9 +107,7 @@ void radio_tx_test()
     }
 }
 
-byte rx_data[1];
-int scn = 0; // счетчик циклов прослушивания эфира
-int sg = 0;  // счетчик числа принятых пакетов с передатчика
+// получение пакетов из эфира
 void radio_rx_test()
 {
     if (!radio.begin())
@@ -130,11 +125,11 @@ void radio_rx_test()
     while (true)
     {
         if (scn < 1000)
-        { // прослушивание эфира
+        { 
+            // прослушивание эфира
             if (radio.available())
             {
                 radio.read(rx_data, 1);
-                //scn++;
                 if (rx_data[0] == 109)
                 {
                     sg++;
@@ -155,7 +150,6 @@ void radio_rx_test()
         }
         scn++;
         delay(2);
-
         if (scn >= 1000) scn = 1000;
     }
 }

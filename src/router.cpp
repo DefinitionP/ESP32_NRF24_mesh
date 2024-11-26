@@ -1,7 +1,7 @@
 #include "router.h"
 #include "header.h"
 
-// Конструктор
+// конструктор
 Router::Router(uint8_t myID, RF24_G &radio)
 {
 	this->radio = radio;
@@ -16,19 +16,18 @@ Router::Router(uint8_t myID, RF24_G &radio)
 	}
 }
 
-// Узнать записанный ID
+// возврат id
 uint8_t Router::getMyID()
 {
 	return myID;
 }
 
-// Так как мы собираемся прокидывать траффик между разными модулями
-// необходимо запомнить адресата и номер посылки
+// подготовка полей со служебной информацией пакета
 void Router::generateExtraPayload(uint8_t receiver)
 {
-	packett[0] = myID << 4 | receiver;
-	packett[1] = lastNumbersOfPackets[myID] >> 8;
-	packett[2] = lastNumbersOfPackets[myID] & 0x00ff; // откусил лишнее
+	packett[0] = myID << 4 | receiver; // номер отправителя
+	packett[1] = lastNumbersOfPackets[myID] >> 8; // номер пакета
+	packett[2] = lastNumbersOfPackets[myID] & 0x00ff;
 }
 
 // очистка пакета
@@ -40,14 +39,14 @@ void Router::clearPacket()
 	}
 }
 
-// Настройка пакета
+// подготовка полей со служебной информацией пакета
 void Router::setupPacket(uint8_t receiver)
 {
 	clearPacket();
 	generateExtraPayload(receiver);
 }
 
-// Проверка, является ли сообщение новым
+// проверка, является ли сообщение новым
 bool Router::checkIfNewMessage(uint8_t senderID, uint16_t numberOfPacket)
 {
 	bool result = ((lastNumbersOfPackets[senderID] < numberOfPacket) || (abs(numberOfPacket - lastNumbersOfPackets[senderID]) > 30000) || (numberOfPacket < 5));
@@ -56,55 +55,52 @@ bool Router::checkIfNewMessage(uint8_t senderID, uint16_t numberOfPacket)
 	{
 		lastNumbersOfPackets[senderID] = numberOfPacket;
 	}
-
 	return result;
 }
 
-// проверка на то, что является приёмником
+// проверка на то, что текущий узел является получаталем пакета
 bool Router::checkIfIAmReceiver(uint8_t extraPayload)
 {
-	return (extraPayload & 0x0f) == myID; // откусываем лишнее
+	return (extraPayload & 0x0f) == myID;
 }
 
-// Перенаправить сообщение
+// перенаправление сообщения. вызывается в случае, если текущий узел не является конечным получателем пакета
 void Router::routeMessage(uint8_t packetToRoute[], String info)
 {
+	// получение номеров отрпавителя и получателя из служебных полей пакета
 	uint8_t receiver = packetToRoute[0] & 0x0f;
-	uint8_t firstSender = packetToRoute[0] >> 4; // мы не хотим возвращать отправителю его же пакет
-
+	uint8_t firstSender = packetToRoute[0] >> 4;
+	// подготовка строки с информацией о перенаправлении 
 	String temp = info;
 	temp += " is redirected to ~> ";
+	// отправка пакета всем узлам в сети, кроме отправителя
 	for (int i = 1; i < DRONE_CNT; i++)
 	{
 		if ((i != myID) && (i != firstSender))
 		{
-			// packetToRoute[3] = myID;
-			packet sender;
-			sender.setAddress(i);
-			sender.addPayload(packetToRoute, 30); // перенаправляем копию как есть
-			// sender.addPayload(packetToRoute, sizeof(packetToRoute)); //перенаправляем копию как есть
-			// Serial.println(packetToRoute[3]);
-			radio.write(&sender);
-
+			
+			packet sender; // создание пакета для отправки
+			sender.setAddress(i); // установка адреса получателя
+			sender.addPayload(packetToRoute, 30); // копируем данные из полученного пакета
+			radio.write(&sender); // отправляем пакет
+			// отправляем информационное сообщение по udp
 			send_string(temp + i);
 			Serial.println(temp + i);
 		}
 	}
 }
 
-// Отправка, которая автоматически сделает редирект
+// отправка сообщения
 void Router::smartSender(uint8_t receiver)
 {
+	// создание пакета
 	packet sender;
 	sender.setAddress(receiver);
 	sender.addPayload(packett, 30);
 	uint8_t type = sender.buffer[5];
 	uint16_t number = (sender.buffer[1] << 8) | sender.buffer[2];
-	// Serial.printf("a: %i\n", sender.buffer[0]);
-	bool ok = radio.write(&sender); // отправили
-
-	// если не получилось отправить, то мы должны передать остальным, что что-то пошло не так
-	// TODO ОБЕРУНТЬ В ФУНКЦИЮ
+	// попытка отправить сразу получателю
+	bool ok = radio.write(&sender); 
 	uint32_t timer2 = millis();
 	if (!ok)
 	{
@@ -122,36 +118,31 @@ void Router::smartSender(uint8_t receiver)
 			}
 		}
 	}
-
 	String info = packet_info(number, myID, myID, receiver, type);
-
+	// если получатель недоступен, отправляем пакет на все остальные узлы
 	if (!ok)
-	{
-		// Serial.println("Редирект");
-		
+	{	
 		for (int i = 1; i < DRONE_CNT; i++)
 		{
 			if ((i != myID) && (i != receiver))
 			{
 				sender.setAddress(i);
 				radio.write(&sender);
-
-				//info += " is redirected to ~> ";
-				//info += i;
 				send_string(info + " is redirected to ~> " + i);
 			}
 		}
 	}
 	else
 	{
+		// если получатель доступен, выводим информационное сообщение
 		info += " sended to receiver -> ";
 		info += receiver;
 		send_string(info);
 	}
+	// прибавление счётчика отрпавленных пакетов
 	lastNumbersOfPackets[myID]++;
 }
 
-// временно неактуальная функция
 bool Router::radioAvailable()
 {
 	return radio.available();

@@ -5,6 +5,18 @@ WiFiUDP SERVER;
 uint8_t test_array[] = {'h', 'e', 'l', 'l', 'o'};
 uint8_t udp_rx_buffer[UDP_TX_SIZE + 1];
 
+// отправка строки по udp 
+void send_string(String out) {
+    uint8_t * array = new uint8_t[out.length()] {};
+    for (int i = 0; i < out.length(); i++) array[i] = out[i];
+    if (server_send(array, out.length(), ground, ground_port))
+    {
+        Serial.println("udp message sended");
+        blink_async(100, 1, false);
+    }
+    delete [] array;
+}
+// отправка массива данных по udp
 int server_send(uint8_t *out, int size, IPAddress ip, uint32_t port)
 {
     SERVER.beginPacket(ip, port);
@@ -12,6 +24,7 @@ int server_send(uint8_t *out, int size, IPAddress ip, uint32_t port)
     return SERVER.endPacket();
     //delete[] out;
 }
+// приём данных по udp
 bool server_read(uint8_t* buffer, int8_t* size, uint32_t timeout) {
     *size = -1;
     Serial.printf("waiting for messages at local port %i\n", board_port);
@@ -28,22 +41,11 @@ bool server_read(uint8_t* buffer, int8_t* size, uint32_t timeout) {
             *size = SERVER.read(buffer, UDP_TX_SIZE);
             buffer[UDP_TX_SIZE] = 0;
             Serial.printf("recieved %i bytes, message: ", *size);
-            //array_println(buffer, *size);
             return true;
         }
         if (millis() - start_time > timeout) return false;
     }
 }
-    
-void send_string(String out) {
-    uint8_t * array = new uint8_t[out.length()] {};
-    for (int i = 0; i < out.length(); i++) array[i] = out[i];
-    if (server_send(array, out.length(), ground, ground_port))
-    {
-        Serial.println("udp message sended");
-        blink_async(100, 1, false);
-    }
-    delete [] array;
-}
+
 
 

@@ -5,4 +5,4 @@
 #define PING_MODE
 
 #define DEFAULT_RECIEVER 5
-#define GROUND_IPADDR (192, 168, 0, 100)
+#define GROUND_IPADDR (192, 168, 31, 87)

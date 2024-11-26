@@ -4,6 +4,7 @@
 #define ROUTER_H_
 #include "Arduino.h"
 
+// число узлов в сети + 1
 const int DRONE_CNT = 6;
 
 class Router
@@ -20,14 +21,17 @@ public:
   bool radioAvailable();
   void changeSendRetriesCount(uint8_t);
   void clearPacket();
+  // массив данных пакета для отправки
   uint8_t packett[30];
+  // id текущего узла
   uint8_t myID;
+  // массив счётчиков пакетов узлов
   uint16_t lastNumbersOfPackets[DRONE_CNT];
 private:
   RF24_G radio;
+  // число попыток отправить пакет получателю напрямую
   uint8_t smartSendRetriesCount;
+  // задержка между попытками
   uint16_t smartSendDelayRetries;
-  
-  
 };
 #endif
